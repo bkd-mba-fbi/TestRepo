@@ -22,10 +22,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Download and install Trivy
+      - name: Download and install latest Trivy
         run: |
-          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.deb
-          sudo dpkg -i trivy_0.51.1_Linux-64bit.deb
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
 
       - name: Run Trivy file system scan and output SARIF
         run: |
