@@ -1,42 +1,36 @@
-name: Security Scan Combo
+name: Trivy SBOM Vulnerability Scan
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1' # Jeden Montag um 06:00
+    - cron: '0 6 * * 1'  # Jeden Montag um 06:00
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-  trivy-scan:
-    name: Trivy SBOM Vulnerability Scan
+  scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install tools (Syft, Trivy)
+      - name: Install Syft + Trivy
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Generate SBOM using Syft
-        run: syft dir:. -o cyclonedx-json=sbom.json || true
+      - name: Generate SBOM (CycloneDX JSON)
+        run: |
+          syft dir:. -o cyclonedx-json > sbom.json
 
-      - name: Run Trivy scan on SBOM
-        run: trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
+      - name: Scan SBOM with Trivy and output SARIF
+        run: |
+          trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
 
-      - name: Upload Trivy SARIF to GitHub Code Scanning
+      - name: Upload SARIF to GitHub Security Alerts
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-report.sarif
-          category: trivy
-
-  codeql:
-    uses: github/codeql-action/analyze@v3
-    needs: trivy-scan
-    with:
-      languages: javascript
