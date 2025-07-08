@@ -35,7 +35,6 @@ findings.forEach((finding) => {
     rules.set(ruleId, {
       id: ruleId,
       name: `${res.component}@${res.version}`,
-      shortDescription: { text: `Schwachstelle in ${res.component}@${res.version}` },
       fullDescription: { text: vulnSummaries },
       helpUri: helpUris[0] || "",
       properties: {
