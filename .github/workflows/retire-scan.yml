@@ -1,16 +1,16 @@
-name: Retire.js Security Scan
+name: Retire.js Code Scan
 
 on:
   push:
     branches: [ main ]
   pull_request:
 
-permissions:                         
-  contents: read                   
-  security-events: write            
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  retirejs-scan:
+  retire:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -21,19 +21,21 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install retire.js
-        run: npm install -g retire
+      - name: Install Retire.js & retire-to-sarif
+        run: |
+          npm install -g retire
+          npm install -g @philips-software/retire-to-sarif
 
-      - name: Run Retire.js and create JSON
+      - name: Run Retire.js
         run: |
           mkdir -p reports
           retire --outputformat json --outputpath reports/retire-report.json || true
 
-      - name: Convert JSON to SARIF
+      - name: Convert to SARIF
         run: |
-          node .github/scripts/convert-retire-json-to-sarif.js > reports/retire-report.sarif
+          retire-to-sarif -i reports/retire-report.json -o reports/retire-report.sarif
 
-      - name: Upload SARIF to GitHub Security Tab
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: reports/retire-report.sarif
