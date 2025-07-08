@@ -26,6 +26,14 @@ jobs:
         run: |
           syft dir:. -o cyclonedx-json > sbom.json
 
+      - name: Check SBOM content
+        run: |
+          echo "🔍 sbom.json Dateigröße:"
+          ls -lah sbom.json || echo "❌ sbom.json wurde nicht gefunden"
+          echo "--- Inhalt (erste 30 Zeilen) ---"
+          head -n 30 sbom.json || echo "❌ Datei leer oder ungültig"
+    
+
       - name: Scan SBOM with Trivy and output SARIF
         run: |
           trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
