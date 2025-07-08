@@ -26,18 +26,18 @@ let ruleIdCounter = 0;
 findings.forEach((finding) => {
   finding.results.forEach((res) => {
     res.vulnerabilities.forEach((vuln, idx) => {
-      const ruleId = `retire-${res.component}-${ruleIdCounter++}`;
+      const summary = vuln.summary || `Unbenannte Schwachstelle in ${res.component}`;
       const cves = vuln.identifiers?.CVE || [];
       const cwes = vuln.identifiers?.CWE || [];
       const helpUris = vuln.info || [];
       const severity = vuln.severity || "medium";
 
-      // Regel pro Schwachstelle
+      const ruleId = `retire-${res.component}-${ruleIdCounter++}`;
       rules.set(ruleId, {
         id: ruleId,
-        name: `${vuln.summary.slice(0, 80)}${vuln.summary.length > 80 ? "…" : ""}`,
-        shortDescription: { text: vuln.summary },
-        fullDescription: { text: vuln.summary },
+        name: summary.length > 80 ? summary.slice(0, 77) + "…" : summary,
+        shortDescription: { text: summary },
+        fullDescription: { text: summary },
         helpUri: helpUris[0] || "",
         properties: {
           tags: ["security", "vulnerability", ...cves, ...cwes],
@@ -45,10 +45,9 @@ findings.forEach((finding) => {
         },
       });
 
-      // Ergebnis zuordnen
       sarif.runs[0].results.push({
         ruleId,
-        message: { text: vuln.summary },
+        message: { text: summary },
         locations: [
           {
             physicalLocation: {
@@ -64,6 +63,5 @@ findings.forEach((finding) => {
 });
 
 sarif.runs[0].tool.driver.rules = Array.from(rules.values());
-
 fs.writeFileSync("retire-report.sarif", JSON.stringify(sarif, null, 2));
-console.log("✅ retire-report.sarif erzeugt (Dependabot-konform).");
+console.log("✅ retire-report.sarif erfolgreich erzeugt.");
