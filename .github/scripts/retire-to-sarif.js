@@ -1,5 +1,3 @@
-// .github/scripts/retire-to-sarif.js
-
 const fs = require("fs");
 
 const raw = fs.readFileSync("retire-report.json");
@@ -28,6 +26,7 @@ findings.forEach((finding) => {
   finding.results.forEach((res) => {
     const vulnSummaries = res.vulnerabilities.map(v => `- ${v.summary}`).join("\n");
     const cves = res.vulnerabilities.flatMap(v => v.identifiers?.CVE || []);
+    const cwEs = res.vulnerabilities.flatMap(v => v.identifiers?.CWE || []);
     const helpUris = res.vulnerabilities.flatMap(v => v.info || []);
     const severities = res.vulnerabilities.map(v => v.severity || "medium");
 
@@ -35,11 +34,11 @@ findings.forEach((finding) => {
     rules.set(ruleId, {
       id: ruleId,
       name: `${res.component}@${res.version}`,
-      shortDescription: { text: `Schwachstellen in ${res.component}@${res.version}` },
+      shortDescription: { text: `Schwachstelle in ${res.component}@${res.version}` },
       fullDescription: { text: vulnSummaries },
       helpUri: helpUris[0] || "",
       properties: {
-        tags: ["security", "vulnerability", ...cves],
+        tags: ["security", "vulnerability", ...cves, ...cwEs],
         severity: severities[0] || "medium",
       },
     });
@@ -65,4 +64,4 @@ findings.forEach((finding) => {
 sarif.runs[0].tool.driver.rules = Array.from(rules.values());
 
 fs.writeFileSync("retire-report.sarif", JSON.stringify(sarif, null, 2));
-console.log("✅ retire-report.sarif erzeugt (zusammengefasst pro Datei + Komponente).");
+console.log("✅ retire-report.sarif erzeugt mit vollständigen Titeln, CVEs und CWEs.");
