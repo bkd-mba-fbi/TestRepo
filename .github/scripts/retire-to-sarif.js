@@ -1,3 +1,4 @@
+// .github/scripts/retire-to-sarif.js
 const fs = require("fs");
 
 const raw = fs.readFileSync("retire-report.json");
@@ -62,6 +63,4 @@ findings.forEach((finding) => {
 });
 
 sarif.runs[0].tool.driver.rules = Array.from(rules.values());
-
 fs.writeFileSync("retire-report.sarif", JSON.stringify(sarif, null, 2));
-console.log("✅ retire-report.sarif erzeugt mit vollständigen Titeln, CVEs und CWEs.");
