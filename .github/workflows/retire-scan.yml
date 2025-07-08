@@ -28,7 +28,6 @@ jobs:
 
       - name: Convert to SARIF
         run: |
-          mkdir -p .github/scripts
           node .github/scripts/retire-to-sarif.js
 
       - name: Upload SARIF to GitHub Code Scanning
