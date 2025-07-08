@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  security-events: write  # ❗ notwendig für upload-sarif
+  security-events: write
 
 jobs:
   retire:
