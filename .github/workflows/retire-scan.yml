@@ -11,27 +11,30 @@ permissions:
   security-events: write
 
 jobs:
-  sbom-grype-scan:
+  grype-scan:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🛠 Install Syft & Grype
+      - name: Install Syft & Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: 🧾 Generate SBOM with Syft (CycloneDX JSON)
+      - name: Generate SBOM from package-lock.json
         run: |
-          syft dir:. -o cyclonedx-json=sbom.json
+          syft packages lockfile=package-lock.json -o cyclonedx-json=sbom.json
 
-      - name: 🛡️ Scan SBOM with Grype (SARIF format)
+      - name: Zeige SBOM-Inhalt (Debug)
+        run: |
+          head -n 30 sbom.json
+
+      - name: Scan SBOM mit Grype und erzeuge SARIF
         run: |
           grype sbom:sbom.json -o sarif > grype-report.sarif || true
 
-      - name: 📤 Upload SARIF to GitHub Code Scanning
+      - name: 📤 Upload SARIF zu GitHub
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: grype-report.sarif
