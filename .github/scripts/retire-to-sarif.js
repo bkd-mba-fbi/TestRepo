@@ -22,43 +22,42 @@ const sarif = {
 };
 
 const rules = new Map();
-
-let resultId = 0;
+let ruleIdCounter = 0;
 
 findings.forEach((finding) => {
   finding.results.forEach((res) => {
-    res.vulnerabilities.forEach((vuln, i) => {
-      const ruleId = `retire-${res.component}-${vuln.identifiers?.CVE?.[0] || resultId}`;
-      const rule = {
-        id: ruleId,
-        name: `${res.component}@${res.version || 'unknown'}`,
-        shortDescription: { text: vuln.summary || "Unbenannte Schwachstelle" },
-        fullDescription: { text: vuln.info?.[0] || "Siehe Retire.js Doku" },
-        helpUri: vuln.info?.[0] || "",
-        properties: {
-          tags: ["security", "vulnerability", ...vuln.identifiers?.CVE || []],
-          precision: "high",
-          severity: vuln.severity || "medium",
-        },
-      };
+    const vulnSummaries = res.vulnerabilities.map(v => `- ${v.summary}`).join("\n");
+    const cves = res.vulnerabilities.flatMap(v => v.identifiers?.CVE || []);
+    const helpUris = res.vulnerabilities.flatMap(v => v.info || []);
+    const severities = res.vulnerabilities.map(v => v.severity || "medium");
 
-      rules.set(ruleId, rule);
+    const ruleId = `retire-${res.component}-${ruleIdCounter++}`;
+    rules.set(ruleId, {
+      id: ruleId,
+      name: `${res.component}@${res.version}`,
+      shortDescription: { text: `Schwachstellen in ${res.component}@${res.version}` },
+      fullDescription: { text: vulnSummaries },
+      helpUri: helpUris[0] || "",
+      properties: {
+        tags: ["security", "vulnerability", ...cves],
+        severity: severities[0] || "medium",
+      },
+    });
 
-      sarif.runs[0].results.push({
-        ruleId,
-        message: { text: `[${res.component}@${res.version}] ${vuln.summary}` },
-        locations: [
-          {
-            physicalLocation: {
-              artifactLocation: {
-                uri: finding.file,
-              },
+    sarif.runs[0].results.push({
+      ruleId,
+      message: {
+        text: `In ${res.component}@${res.version} wurden ${res.vulnerabilities.length} Schwachstellen erkannt:\n${vulnSummaries}`,
+      },
+      locations: [
+        {
+          physicalLocation: {
+            artifactLocation: {
+              uri: finding.file,
             },
           },
-        ],
-      });
-
-      resultId++;
+        },
+      ],
     });
   });
 });
@@ -66,4 +65,4 @@ findings.forEach((finding) => {
 sarif.runs[0].tool.driver.rules = Array.from(rules.values());
 
 fs.writeFileSync("retire-report.sarif", JSON.stringify(sarif, null, 2));
-console.log("✅ retire-report.sarif erfolgreich erstellt.");
+console.log("✅ retire-report.sarif erzeugt (zusammengefasst pro Datei + Komponente).");
