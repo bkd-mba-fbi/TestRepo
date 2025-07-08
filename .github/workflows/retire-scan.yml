@@ -1,19 +1,16 @@
-name: Retire.js Code Scan
+name: Retire.js HTML Report
 
 on:
   push:
     branches: [ main ]
   pull_request:
 
-permissions:
-  contents: read
-  security-events: write
-
 jobs:
-  retire:
+  retirejs:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Install Node.js
@@ -21,21 +18,29 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Retire.js & retire-to-sarif
-        run: |
-          npm install -g retire
-          npm install -g @philips-software/retire-to-sarif
+      - name: Install Retire.js
+        run: npm install -g retire
 
-      - name: Run Retire.js
+      - name: Run Retire.js and create JSON report
         run: |
           mkdir -p reports
-          retire --outputformat json --outputpath reports/retire-report.json || true
+          retire --path . --outputformat json --outputpath reports/retire-report.json || true
 
-      - name: Convert to SARIF
+      - name: Generate HTML from Retire Report
         run: |
-          retire-to-sarif -i reports/retire-report.json -o reports/retire-report.sarif
+          node .github/scripts/generate-retire-html.js
 
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload HTML Report
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: reports/retire-report.sarif
+          name: RetireJS HTML Report
+          path: reports/retire-report.html
+
+      - name: Fail if vulnerabilities were found
+        run: |
+          if grep -q '"severity":' reports/retire-report.json; then
+            echo "❌ Vulnerabilities found!"
+            exit 1
+          else
+            echo "✅ No vulnerabilities found."
+          fi
