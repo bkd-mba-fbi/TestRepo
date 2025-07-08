@@ -1,49 +1,93 @@
-name: Trivy SBOM Vulnerability Scan
+name: Security Scan Combo
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'  # Jeden Montag um 06:00
+    - cron: '0 6 * * 1'  # Jeden Montag um 06:00 Uhr
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-  scan:
+
+  retirejs:
+    name: Retire.js Scan
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Syft + Trivy
+      - name: Install Retire.js
+        run: npm install -g retire
+
+      - name: Run Retire.js
+        run: retire --path . --outputformat json --outputpath retire-report.json || true
+
+      - name: Convert to SARIF
+        run: |
+          mkdir -p .github/scripts
+          node .github/scripts/retire-to-sarif.js
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: retire-report.sarif
+          category: retirejs
+
+  grype:
+    name: SBOM Scan mit Grype
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Syft und Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Generate SBOM (SPDX-JSON for Trivy)
-        run: |
-          syft dir:. -o spdx-json > sbom.json
+      - name: Generate SBOM
+        run: syft dir:. -o cyclonedx-json > sbom.json
 
-      - name: Inspect SBOM
-        run: |
-          echo "📦 SBOM-Datei erzeugt:"
-          ls -lah sbom.json || echo "❌ sbom.json nicht gefunden"
-          echo "--- Vorschau (erste 30 Zeilen) ---"
-          head -n 30 sbom.json || echo "❌ Datei leer oder ungültig"
-
-      - name: Scan SBOM with Trivy and generate SARIF
-        run: |
-          trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
-
-
-      - name: Fix SARIF for GitHub
-        run: |
-          jq '.runs[0].tool.driver.name = "Trivy"' trivy-report.sarif > fixed-trivy-report.sarif
+      - name: Scan SBOM mit Grype
+        run: grype sbom:sbom.json -o sarif > grype-report.sarif || true
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: fixed-trivy-report.sarif
+          sarif_file: grype-report.sarif
+          category: grype
+
+  codeql:
+    name: CodeQL Analyse
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: CodeQL initialisieren
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: CodeQL Analyse durchführen
+        uses: github/codeql-action/analyze@v3

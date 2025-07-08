@@ -1,6 +1,6 @@
 // .github/scripts/retire-to-sarif.js
-const fs = require("fs");
 
+const fs = require("fs");
 const raw = fs.readFileSync("retire-report.json");
 const findings = JSON.parse(raw).data || [];
 
@@ -25,41 +25,45 @@ let ruleIdCounter = 0;
 
 findings.forEach((finding) => {
   finding.results.forEach((res) => {
-    const vulnSummaries = res.vulnerabilities.map(v => `- ${v.summary}`).join("\n");
-    const cves = res.vulnerabilities.flatMap(v => v.identifiers?.CVE || []);
-    const cwEs = res.vulnerabilities.flatMap(v => v.identifiers?.CWE || []);
-    const helpUris = res.vulnerabilities.flatMap(v => v.info || []);
-    const severities = res.vulnerabilities.map(v => v.severity || "medium");
+    res.vulnerabilities.forEach((vuln, idx) => {
+      const ruleId = `retire-${res.component}-${ruleIdCounter++}`;
+      const cves = vuln.identifiers?.CVE || [];
+      const cwes = vuln.identifiers?.CWE || [];
+      const helpUris = vuln.info || [];
+      const severity = vuln.severity || "medium";
 
-    const ruleId = `retire-${res.component}-${ruleIdCounter++}`;
-    rules.set(ruleId, {
-      id: ruleId,
-      name: `${res.component}@${res.version}`,
-      fullDescription: { text: vulnSummaries },
-      helpUri: helpUris[0] || "",
-      properties: {
-        tags: ["security", "vulnerability", ...cves, ...cwEs],
-        severity: severities[0] || "medium",
-      },
-    });
+      // Regel pro Schwachstelle
+      rules.set(ruleId, {
+        id: ruleId,
+        name: `${vuln.summary.slice(0, 80)}${vuln.summary.length > 80 ? "…" : ""}`,
+        shortDescription: { text: vuln.summary },
+        fullDescription: { text: vuln.summary },
+        helpUri: helpUris[0] || "",
+        properties: {
+          tags: ["security", "vulnerability", ...cves, ...cwes],
+          severity: severity,
+        },
+      });
 
-    sarif.runs[0].results.push({
-      ruleId,
-      message: {
-        text: `In ${res.component}@${res.version} wurden ${res.vulnerabilities.length} Schwachstellen erkannt:\n${vulnSummaries}`,
-      },
-      locations: [
-        {
-          physicalLocation: {
-            artifactLocation: {
-              uri: finding.file,
+      // Ergebnis zuordnen
+      sarif.runs[0].results.push({
+        ruleId,
+        message: { text: vuln.summary },
+        locations: [
+          {
+            physicalLocation: {
+              artifactLocation: {
+                uri: finding.file,
+              },
             },
           },
-        },
-      ],
+        ],
+      });
     });
   });
 });
 
 sarif.runs[0].tool.driver.rules = Array.from(rules.values());
+
 fs.writeFileSync("retire-report.sarif", JSON.stringify(sarif, null, 2));
+console.log("✅ retire-report.sarif erzeugt (Dependabot-konform).");
