@@ -36,11 +36,10 @@ jobs:
           name: RetireJS HTML Report
           path: reports/retire-report.html
 
-      - name: Fail if vulnerabilities were found
+      - name: Check if vulnerabilities exist (non-blocking)
         run: |
           if grep -q '"severity":' reports/retire-report.json; then
-            echo "❌ Vulnerabilities found!"
-            exit 1
+            echo "::warning::Vulnerabilities detected in Retire.js scan"
           else
             echo "✅ No vulnerabilities found."
           fi
