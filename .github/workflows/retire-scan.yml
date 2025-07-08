@@ -1,40 +1,35 @@
-name: SBOM CVE Scan (Syft + Grype)
+name: Retire.js Security Scan
 
 on:
   push:
-    branches: [main]
-  schedule:
-    - cron: '0 6 * * 1'  # Jeden Montag um 06:00
-
-permissions:
-  contents: read
-  security-events: write
+    branches: [ main ]
+  pull_request:
 
 jobs:
-  grype-scan:
+  retirejs-scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Install Syft & Grype
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-
-      - name: Generate SBOM from package-lock.json
-        run: |
-          syft packages lockfile=package-lock.json -o cyclonedx-json=sbom.json
-
-      - name: Zeige SBOM-Inhalt (Debug)
-        run: |
-          head -n 30 sbom.json
-
-      - name: Scan SBOM mit Grype und erzeuge SARIF
-        run: |
-          grype sbom:sbom.json -o sarif > grype-report.sarif || true
-
-      - name: 📤 Upload SARIF zu GitHub
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v3
         with:
-          sarif_file: grype-report.sarif
+          node-version: 20
+
+      - name: Install retire.js
+        run: npm install -g retire
+
+      - name: Run Retire.js and create JSON
+        run: |
+          mkdir -p reports
+          retire --outputformat json --outputpath reports/retire-report.json || true
+
+      - name: Convert JSON to SARIF
+        run: |
+          node .github/scripts/convert-retire-json-to-sarif.js > reports/retire-report.sarif
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: reports/retire-report.sarif
