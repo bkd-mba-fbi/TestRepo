@@ -8,10 +8,10 @@ on:
 
 jobs:
   analyze:
-    name: CodeQL-Analyse
     runs-on: ubuntu-latest
     permissions:
       security-events: write
+      actions: read
       contents: read
 
     strategy:
@@ -24,12 +24,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Init CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
+        uses: github/codeql-action/autobuild@v3
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
