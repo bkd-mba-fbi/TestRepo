@@ -1,92 +1,37 @@
-name: Security Scan Combo
+name: SBOM CVE Scan (Syft + Grype)
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'  # Jeden Montag um 06:00 Uhr
+    - cron: '0 6 * * 1'  # Jeden Montag um 06:00
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-
-  retirejs:
-    name: Retire.js Scan
+  sbom-grype-scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Retire.js
-        run: npm install -g retire
-
-      - name: Run Retire.js
-        run: retire --path . --outputformat json --outputpath retire-report.json || true
-
-      - name: Convert to SARIF
-        run: |
-          node .github/scripts/retire-to-sarif.js
-
-      - name: Upload SARIF to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: retire-report.sarif
-          category: retirejs
-
-  grype:
-    name: SBOM Scan mit Grype
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Syft und Grype
+      - name: 🛠 Install Syft & Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Generate SBOM
-        run: syft dir:. -o cyclonedx-json > sbom.json
+      - name: 🧾 Generate SBOM with Syft (CycloneDX JSON)
+        run: |
+          syft dir:. -o cyclonedx-json=sbom.json
 
-      - name: Scan SBOM mit Grype
-        run: grype sbom:sbom.json -o sarif > grype-report.sarif || true
+      - name: 🛡️ Scan SBOM with Grype (SARIF format)
+        run: |
+          grype sbom:sbom.json -o sarif > grype-report.sarif || true
 
-      - name: Upload SARIF
+      - name: 📤 Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: grype-report.sarif
-          category: grype
-
-  codeql:
-    name: CodeQL Analyse
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: CodeQL initialisieren
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: CodeQL Analyse durchführen
-        uses: github/codeql-action/analyze@v3
