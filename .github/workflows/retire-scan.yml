@@ -38,13 +38,12 @@ jobs:
         run: |
           trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
 
-      - name: Check SARIF output
-        run: |
-          echo "🧪 SARIF-Datei erzeugt:"
-          ls -lah trivy-report.sarif || echo "❌ SARIF nicht erzeugt"
-          head -n 30 trivy-report.sarif || echo "❌ SARIF-Datei leer oder ungültig"
 
-      - name: Upload SARIF to GitHub Code Scanning
+      - name: Fix SARIF for GitHub
+        run: |
+          jq '.runs[0].tool.driver.name = "Trivy"' trivy-report.sarif > fixed-trivy-report.sarif
+
+      - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-report.sarif
+          sarif_file: fixed-trivy-report.sarif
