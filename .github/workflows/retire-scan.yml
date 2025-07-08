@@ -1,39 +1,37 @@
-name: Retire.js Scan
+# .github/workflows/code-scanning-trivy.yml
+name: Trivy Security Scan
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   schedule:
-    - cron: '0 7 * * 1'  # Montags 07:00
+    - cron: '0 7 * * 1'  # jeden Montag um 07:00 Uhr
 
 permissions:
   contents: read
-  security-events: write
+  security-events: write  # Benötigt für SARIF Upload
 
 jobs:
-  retire:
+  trivy-scan:
+    name: Trivy Code Scanning
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Retire.js
-        run: npm install -g retire
-
-      - name: Run Retire.js scan
-        run: retire --path . --outputformat json --outputpath retire-report.json || true
-
-      - name: Convert Retire.js JSON to SARIF
+      - name: Download and install Trivy
         run: |
-          node .github/scripts/retire-to-sarif.js
+          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.51.1_Linux-64bit.deb
+          sudo dpkg -i trivy_0.51.1_Linux-64bit.deb
 
-      - name: Upload SARIF to GitHub Code Scanning Alerts
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Run Trivy file system scan and output SARIF
+        run: |
+          trivy fs . --format sarif --output trivy-results.sarif || true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: retire-report.sarif
+          sarif_file: trivy-results.sarif
