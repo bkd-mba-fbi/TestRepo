@@ -1,4 +1,4 @@
-name: Retire.js HTML Report
+name: Retire.js Code Scan
 
 on:
   push:
@@ -10,32 +10,33 @@ permissions:
   security-events: write
 
 jobs:
-  retirejs:
+  retire:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      - name: Install Retire.js
-        run: npm install -g retire
+      - name: Install Tools
+        run: |
+          npm install -g retire
+          npm install -g @philips-software/retire-to-sarif
 
-      - name: Run Retire.js and create JSON report
+      - name: Run Retire and export JSON
         run: |
           mkdir -p reports
-          retire --path . --outputformat json --outputpath reports/retire-report.json || true
+          retire --outputformat json --outputpath reports/retire-report.json || true
 
-      - name: Generate HTML from Retire Report
+      - name: Convert JSON to SARIF
         run: |
-          node .github/scripts/generate-retire-html.js
+          retire-to-sarif -i reports/retire-report.json -o reports/retire-report.sarif
 
-      - name: Upload HTML Report
-        uses: actions/upload-artifact@v4
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          name: RetireJS HTML Report
-          path: reports/retire-report.html
+          sarif_file: reports/retire-report.sarif
