@@ -1,17 +1,17 @@
-name: Retire.js Security Scan
+name: Retire.js CVE Scan mit E-Mail
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  retire-scan:
+  scan-and-mail:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -22,13 +22,38 @@ jobs:
       - name: Install Retire.js
         run: npm install -g retire
 
-      - name: Run Retire.js scan
+      - name: Run Retire.js and create report
         run: |
           retire --path . --outputformat json --outputpath retire-report.json || true
-          cat retire-report.json
+          node <<'EOF'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('retire-report.json', 'utf8'));
+          if (report.data.length === 0) {
+            fs.writeFileSync('mail.txt', '✅ Keine Schwachstellen gefunden.');
+            return;
+          }
+          let out = `🚨 Retire.js Schwachstellen gefunden:\n\n`;
+          report.data.forEach(entry => {
+            out += `📄 Datei: ${entry.file}\n`;
+            entry.results.forEach(res => {
+              out += `- 📦 ${res.component} (${res.version})\n`;
+              res.vulnerabilities.forEach(v => {
+                out += `  ⚠️ ${v.severity || 'Unbekannt'} – ${v.identifiers?.CVE?.join(', ') || v.info?.join(', ')}\n`;
+              });
+            });
+            out += `\n`;
+          });
+          fs.writeFileSync('mail.txt', out);
+          EOF
 
-      - name: Upload report artifact
-        uses: actions/upload-artifact@v4
+      - name: Send Email Report
+        uses: dawidd6/action-send-mail@v3
         with:
-          name: retire-report
-          path: retire-report.json
+          server_address: mailrelay.svc.kb-bedag.ch
+          server_port: 25
+          secure: false
+          subject: "🚨 Retire.js Scan Report"
+          to: walid.boulhazayez@be.ch
+          from: fbi.mba@be.ch
+          content_type: text/plain
+          body_file: mail.txt
