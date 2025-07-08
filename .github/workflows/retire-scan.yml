@@ -30,7 +30,7 @@ jobs:
           const report = JSON.parse(fs.readFileSync('retire-report.json', 'utf8'));
           if (report.data.length === 0) {
             fs.writeFileSync('mail.txt', '✅ Keine Schwachstellen gefunden.');
-            return;
+            process.exit(0);
           }
           let out = `🚨 Retire.js Schwachstellen gefunden:\n\n`;
           report.data.forEach(entry => {
