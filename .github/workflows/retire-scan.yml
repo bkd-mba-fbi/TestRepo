@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write  # ❗ notwendig für upload-sarif
 
 jobs:
   retire:
@@ -17,16 +18,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Install Retire.js
         run: npm install -g retire
 
       - name: Run Retire.js scan
-        run: |
-          retire --path . --outputformat json --outputpath retire-report.json || true
-          cat retire-report.json
+        run: retire --path . --outputformat json --outputpath retire-report.json || true
 
-      - name: Upload Retire.js report
-        uses: actions/upload-artifact@v4
+      - name: Convert Retire.js JSON to SARIF
+        run: |
+          node .github/scripts/retire-to-sarif.js
+
+      - name: Upload SARIF to GitHub Code Scanning Alerts
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          name: retire-report
-          path: retire-report.json
+          sarif_file: retire-report.sarif
