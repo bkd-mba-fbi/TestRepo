@@ -1,37 +1,89 @@
-# .github/workflows/code-scanning-trivy.yml
-name: Trivy Security Scan
+name: Combined Security Scan
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   schedule:
-    - cron: '0 7 * * 1'  # jeden Montag um 07:00 Uhr
+    - cron: '0 7 * * 1'  # Jeden Montag um 07:00
 
 permissions:
   contents: read
-  security-events: write  # Benötigt für SARIF Upload
+  security-events: write
 
 jobs:
-  trivy-scan:
-    name: Trivy Code Scanning
-    runs-on: ubuntu-latest
 
+  retirejs:
+    name: Retire.js Scan
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download and install latest Trivy
+      - name: Install Retire.js
+        run: npm install -g retire
+
+      - name: Run Retire.js
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          retire --path . --outputformat json --outputpath retire-report.json || true
 
-
-      - name: Run Trivy file system scan and output SARIF
+      - name: Convert to SARIF
         run: |
-          trivy fs . --format sarif --output trivy-results.sarif || true
+          mkdir -p .github/scripts
+          echo "<INSERT retire-to-sarif.js CONTENT HERE>" > .github/scripts/retire-to-sarif.js
+          node .github/scripts/retire-to-sarif.js
 
-      - name: Upload SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-results.sarif
+          sarif_file: retire-report.sarif
+
+  sbom-grype:
+    name: SBOM + Grype Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Syft + Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM
+        run: syft dir:. -o cyclonedx-json > sbom.json
+
+      - name: Scan SBOM with Grype
+        run: grype sbom:sbom.json -o sarif > grype-report.sarif || true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: grype-report.sarif
+
+  codeql:
+    name: CodeQL Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
