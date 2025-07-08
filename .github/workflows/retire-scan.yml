@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: '0 7 * * 1'  # Montags 07:00
 
+permissions:
+  contents: read
+
 jobs:
   retire:
     runs-on: ubuntu-latest
