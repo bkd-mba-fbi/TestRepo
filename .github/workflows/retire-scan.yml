@@ -13,6 +13,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,25 +21,30 @@ jobs:
       - name: Install Syft + Trivy
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Generate SBOM (CycloneDX JSON)
+      - name: Generate SBOM (SPDX-JSON for Trivy)
         run: |
-          syft dir:. -o cyclonedx-json > sbom.json
+          syft dir:. -o spdx-json > sbom.json
 
-      - name: Check SBOM content
+      - name: Inspect SBOM
         run: |
-          echo "🔍 sbom.json Dateigröße:"
-          ls -lah sbom.json || echo "❌ sbom.json wurde nicht gefunden"
-          echo "--- Inhalt (erste 30 Zeilen) ---"
+          echo "📦 SBOM-Datei erzeugt:"
+          ls -lah sbom.json || echo "❌ sbom.json nicht gefunden"
+          echo "--- Vorschau (erste 30 Zeilen) ---"
           head -n 30 sbom.json || echo "❌ Datei leer oder ungültig"
-    
 
-      - name: Scan SBOM with Trivy and output SARIF
+      - name: Scan SBOM with Trivy and generate SARIF
         run: |
           trivy sbom sbom.json --format sarif --output trivy-report.sarif || true
 
-      - name: Upload SARIF to GitHub Security Alerts
+      - name: Check SARIF output
+        run: |
+          echo "🧪 SARIF-Datei erzeugt:"
+          ls -lah trivy-report.sarif || echo "❌ SARIF nicht erzeugt"
+          head -n 30 trivy-report.sarif || echo "❌ SARIF-Datei leer oder ungültig"
+
+      - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-report.sarif
