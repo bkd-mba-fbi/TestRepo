@@ -22,7 +22,14 @@ if (!data.data || data.data.length === 0) {
       result.vulnerabilities.forEach((vuln) => {
         html += `<ul>`;
         html += `<li><strong>Schwere:</strong> ${vuln.severity || "?"}</li>`;
-        html += `<li><strong>CVE:</strong> ${vuln.identifiers?.cve || "-"}</li>`;
+        let cve = "-";
+        if (Array.isArray(vuln.info)) {
+          const match = vuln.info.find((url) =>
+            url.includes("CVE-")
+          );
+          if (match) cve = match.split("/").pop();
+        }
+        html += `<li><strong>CVE:</strong> ${cve}</li>`;
         if (vuln.info) {
           html += `<li><strong>Details:</strong><ul>`;
           vuln.info.forEach((link) => {
