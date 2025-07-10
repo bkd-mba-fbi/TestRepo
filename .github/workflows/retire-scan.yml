@@ -1,4 +1,4 @@
-name: Retire.js HTML Report
+name: Combined Vulnerability Scan
 
 on:
   push:
@@ -10,11 +10,11 @@ permissions:
   security-events: write
 
 jobs:
-  retire:
+  scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Setup Node.js
@@ -22,20 +22,44 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install retire.js
+      - name: Install Retire.js
         run: npm install -g retire
 
-      - name: Run retire.js to JSON
+      - name: Run Retire.js and create JSON report
         run: |
           mkdir -p reports
           retire --path . --outputformat json --outputpath reports/retire-report.json || true
 
-      - name: Generate HTML report
+      - name: Generate HTML from Retire.js Report
         run: |
           node .github/scripts/generate-retire-html.js
 
-      - name: Upload HTML report as artifact
+      - name: Download Syft & Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b . v1.0.1
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b . v0.75.1
+
+      - name: Generate SBOM with Syft
+        run: |
+          ./syft dir:. -o cyclonedx-json=reports/sbom.json || true
+
+      - name: Scan SBOM with Grype → SARIF
+        run: |
+          ./grype sbom:reports/sbom.json -o sarif > reports/grype-report.sarif || true
+
+      - name: Upload Retire.js HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: RetireJS HTML Report
           path: reports/retire-report.html
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: SBOM (Syft)
+          path: reports/sbom.json
+
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: reports/grype-report.sarif

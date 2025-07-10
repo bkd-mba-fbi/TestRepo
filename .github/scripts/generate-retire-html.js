@@ -20,15 +20,14 @@ if (!data.data || data.data.length === 0) {
     entry.results.forEach((result) => {
       html += `<p><strong>${result.component}</strong> v${result.version}</p>`;
       result.vulnerabilities.forEach((vuln) => {
-        html += `<ul>`;
-        html += `<li><strong>Schwere:</strong> ${vuln.severity || "?"}</li>`;
         let cve = "-";
         if (Array.isArray(vuln.info)) {
-          const match = vuln.info.find((url) =>
-            url.includes("CVE-")
-          );
+          const match = vuln.info.find((url) => url.includes("CVE-"));
           if (match) cve = match.split("/").pop();
         }
+
+        html += `<ul>`;
+        html += `<li><strong>Schwere:</strong> ${vuln.severity || "?"}</li>`;
         html += `<li><strong>CVE:</strong> ${cve}</li>`;
         if (vuln.info) {
           html += `<li><strong>Details:</strong><ul>`;
